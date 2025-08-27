@@ -145,6 +145,16 @@ npm run excel
 - Erstellt User in `users` Tabelle
 - Speichert Hobby-Präferenzen in `user_hobbies`
 
+#### Mongo Import
+
+```bash
+cd results/scripts
+npm run mongo
+```
+
+- Liest likes und messages aus der MongoDB-Datenbank
+- Importiert diese Daten in die PostgreSQL-Tabellen likes und messages
+
 #### XML Import
 
 ```bash
