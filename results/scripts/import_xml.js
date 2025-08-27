@@ -53,10 +53,10 @@ async function importXmlData() {
         );
         const hobbyId = hobbyResult.rows[0].id;
 
-        // In user_interests speichern
+        // In user_hobbies speichern
         try {
           await client.query(
-            'INSERT INTO user_interests (user_id, hobby_id) VALUES ($1, $2)',
+            'INSERT INTO user_hobbies (user_id, hobby_id) VALUES ($1, $2)',
             [userId, hobbyId]
           );
           console.log(`Fähigkeit "${hobbyName}" zu ${userName} hinzugefügt`);

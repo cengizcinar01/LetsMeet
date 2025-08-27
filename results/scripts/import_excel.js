@@ -85,9 +85,9 @@ async function importExcelData() {
           );
           const hobbyId = hobbyResult.rows[0].id;
 
-          // In user_hobbies speichern (was User bei anderen SUCHT)
+          // In user_hobby_preferences speichern
           await client.query(
-            'INSERT INTO user_hobbies (user_id, hobby_id, user_priority) VALUES ($1, $2, $3)',
+            'INSERT INTO user_hobby_preferences (user_id, hobby_id, user_priority) VALUES ($1, $2, $3)',
             [userId, hobbyId, suchPrioritaet]
           );
         }
