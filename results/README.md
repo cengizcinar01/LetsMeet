@@ -112,3 +112,53 @@ docker-compose down
 - **Benutzer**: user
 - **Passwort**: secret
 - **Datenbank**: lf8_lets_meet_db
+
+## Import Scripts
+
+### Installation
+
+```bash
+cd results/scripts
+npm install
+```
+
+### Datenbank Setup
+
+```bash
+# 1. Container starten
+docker-compose up -d
+
+# 2. Tabellen erstellen
+PGPASSWORD=secret psql -h localhost -U user -d lf8_lets_meet_db -f results/scripts/create_tables.sql
+```
+
+### Import Ausführung
+
+#### Excel Import
+
+```bash
+cd results/scripts
+npm run excel
+```
+
+- Liest `Lets Meet DB Dump.xlsx`
+- Erstellt User in `users` Tabelle
+- Speichert Hobby-Präferenzen in `user_hobbies`
+
+#### XML Import
+
+```bash
+cd results/scripts
+npm run xml
+```
+
+- Liest `Lets_Meet_Hobbies.xml`
+- Fügt Hobby-Fähigkeiten zu existierenden Usern hinzu
+- Speichert in `user_interests`
+
+#### Alle Scripts nacheinander
+
+```bash
+cd results/scripts
+npm run all
+```
