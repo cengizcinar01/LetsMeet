@@ -1,85 +1,77 @@
-const fs = require('fs');
+const fs = require('fs/promises');
 const xml2js = require('xml2js');
 const {Client} = require('pg');
 
-const client = new Client({
+const PG_CONFIG = {
   host: 'localhost',
   database: 'lf8_lets_meet_db',
   user: 'user',
   password: 'secret',
-});
+};
+const XML_FILE_PATH = '../../Lets_Meet_Hobbies.xml';
 
-async function importXmlData() {
-  await client.connect();
+async function main() {
+  console.log('Starte XML-Import (Hobby-Fähigkeiten)...');
+  const pgClient = new Client(PG_CONFIG);
+  await pgClient.connect();
 
-  // XML Datei lesen
-  const xmlData = fs.readFileSync('../../Lets_Meet_Hobbies.xml', 'utf-8');
-  const parser = new xml2js.Parser();
-  const result = await parser.parseStringPromise(xmlData);
+  let addedCount = 0;
+  let skippedCount = 0;
 
-  const users = result.users.user;
+  try {
+    // Alle Benutzer-IDs aus PostgreSQL laden, um Abfragen in der Schleife zu vermeiden
+    const userRes = await pgClient.query('SELECT id, email FROM users');
+    const userEmailToIdMap = new Map(
+      userRes.rows.map((user) => [user.email, user.id])
+    );
 
-  for (const user of users) {
-    const email = user.email[0];
-    const hobbies = user.hobbies[0].hobby;
+    // XML-Datei einlesen und parsen
+    const xmlData = await fs.readFile(XML_FILE_PATH, 'utf-8');
+    const result = await xml2js.parseStringPromise(xmlData);
 
-    try {
-      // Existierende User finden
-      const userResult = await client.query(
-        'SELECT id, first_name, last_name FROM users WHERE email = $1',
-        [email]
-      );
+    // Durch jeden Benutzer in der XML-Datei iterieren
+    for (const user of result.users.user) {
+      const email = user.email[0];
+      const userId = userEmailToIdMap.get(email);
 
-      if (userResult.rows.length === 0) {
-        console.log(`User ${email} nicht in DB gefunden - übersprungen`);
-        continue;
-      }
+      if (!userId) continue; // Benutzer nicht gefunden, überspringen
 
-      const userId = userResult.rows[0].id;
-      const userName = `${userResult.rows[0].first_name} ${userResult.rows[0].last_name}`;
-
-      // Hobby-Fähigkeiten verarbeiten
-      for (const hobbyName of hobbies) {
-        // Hobby in Master-Liste erstellen
-        await client.query(
-          'INSERT INTO hobbies (name) VALUES ($1) ON CONFLICT (name) DO NOTHING',
-          [hobbyName]
-        );
-
-        // Hobby ID holen
-        const hobbyResult = await client.query(
-          'SELECT id FROM hobbies WHERE name = $1',
-          [hobbyName]
-        );
-        const hobbyId = hobbyResult.rows[0].id;
-
-        // In user_hobbies speichern
+      // Durch die Hobbys des Benutzers iterieren
+      for (const hobbyName of user.hobbies[0].hobby) {
         try {
-          await client.query(
-            'INSERT INTO user_hobbies (user_id, hobby_id) VALUES ($1, $2)',
+          // Hobby anlegen (falls nicht vorhanden) und ID in einem Schritt abfragen
+          const hobbyRes = await pgClient.query(
+            `WITH ins AS (
+              INSERT INTO hobbies (name) VALUES ($1) ON CONFLICT(name) DO NOTHING RETURNING id
+            )
+            SELECT id FROM ins UNION ALL SELECT id FROM hobbies WHERE name = $1 LIMIT 1`,
+            [hobbyName.trim()]
+          );
+          const hobbyId = hobbyRes.rows[0].id;
+
+          // Benutzer und Hobby verknüpfen
+          await pgClient.query(
+            'INSERT INTO user_hobbies (user_id, hobby_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
             [userId, hobbyId]
           );
-          console.log(`Fähigkeit "${hobbyName}" zu ${userName} hinzugefügt`);
+          addedCount++;
         } catch (error) {
           if (error.code === '23505') {
-            console.log(
-              `Fähigkeit "${hobbyName}" bereits bei ${userName} vorhanden`
-            );
+            skippedCount++;
           } else {
-            console.error(
-              `Fehler bei Fähigkeit "${hobbyName}":`,
-              error.message
-            );
+            throw error;
           }
         }
       }
-    } catch (error) {
-      console.error(`Fehler bei User ${email}:`, error.message);
     }
+    console.log(
+      `XML-Import: ${addedCount} Fähigkeiten hinzugefügt (${skippedCount} übersprungen).`
+    );
+  } catch (error) {
+    console.error(`Import fehlgeschlagen: ${error.message}`);
+  } finally {
+    await pgClient.end();
   }
-
-  await client.end();
-  console.log('XML-Import abgeschlossen!');
 }
 
-importXmlData();
+main();

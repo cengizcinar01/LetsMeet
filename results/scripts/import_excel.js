@@ -1,110 +1,95 @@
 const xlsx = require('xlsx');
 const {Client} = require('pg');
 
-const client = new Client({
+const PG_CONFIG = {
   host: 'localhost',
   database: 'lf8_lets_meet_db',
   user: 'user',
   password: 'secret',
-});
+};
+const EXCEL_FILE_PATH = '../../Lets Meet DB Dump.xlsx';
 
-async function importExcelData() {
-  await client.connect();
+async function main() {
+  console.log('Starte Excel-Import...');
+  const pgClient = new Client(PG_CONFIG);
+  await pgClient.connect();
 
-  // Excel Datei lesen
-  const workbook = xlsx.readFile('../../Lets Meet DB Dump.xlsx');
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const data = xlsx.utils.sheet_to_json(worksheet, {header: 1});
+  let importedCount = 0;
+  let skippedCount = 0;
 
-  // Erste Zeile überspringen (Header)
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (!row || row.length === 0) continue;
+  try {
+    // Excel-Datei einlesen und in ein JSON-Format umwandeln
+    const workbook = xlsx.readFile(EXCEL_FILE_PATH);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = xlsx.utils.sheet_to_json(sheet, {header: 1});
 
-    // Daten aus Excel extrahieren
-    const name = row[0].split(', ');
-    const vorname = name[1];
-    const nachname = name[0];
+    // Durch jede Zeile iterieren (erste Zeile ist die Überschrift, wird übersprungen)
+    for (const row of data.slice(1)) {
+      if (!row || row.length === 0) continue;
 
-    // Adresse aufteilen: "Straße Nr, PLZ, Ort"
-    const adresse = row[1].split(', ');
-    const strasse = adresse[0]; // Komplette Straße mit Hausnummer
-    const plz = adresse[1];
-    const ort = adresse[2];
+      try {
+        // Benutzerdaten aus den Zeilen extrahieren und formatieren
+        const [nachname, vorname] = row[0].split(', ');
+        const [strasse, plz, ort] = row[1].split(', ');
+        const geburtsdatum = row[7].split('.').reverse().join('-'); // Wandelt TT.MM.JJJJ in JJJJ-MM-TT um
 
-    const telefon = row[2];
-    const email = row[4];
-    const geschlecht = row[5];
-    const interessiert = row[6];
+        // Benutzer in die Datenbank einfügen und die neue ID zurückbekommen
+        const userRes = await pgClient.query(
+          `INSERT INTO users (first_name, last_name, email, birth_date, gender, interested_in_gender, street, postal_code, city, phone_number)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+          [
+            vorname,
+            nachname,
+            row[4],
+            geburtsdatum,
+            row[5],
+            row[6],
+            strasse,
+            plz,
+            ort,
+            row[2],
+          ]
+        );
+        const userId = userRes.rows[0].id;
 
-    // Geburtsdatum umwandeln
-    const geburt = row[7].split('.');
-    const geburtsdatum = `${geburt[2]}-${geburt[1]}-${geburt[0]}`;
+        // Hobbys verarbeiten
+        const hobbies = row[3].split(';').filter((h) => h.trim());
+        for (const hobbyStr of hobbies) {
+          const [hobbyName, prio] = hobbyStr.split('%');
 
-    // Benutzer erstellen
-    try {
-      const userResult = await client.query(
-        `
-                INSERT INTO users (first_name, last_name, email, birth_date, gender, 
-                                 interested_in_gender, street, postal_code, city, phone_number)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id
-            `,
-        [
-          vorname,
-          nachname,
-          email,
-          geburtsdatum,
-          geschlecht,
-          interessiert,
-          strasse,
-          plz,
-          ort,
-          telefon,
-        ]
-      );
-
-      const userId = userResult.rows[0].id;
-
-      // Hobby-Präferenzen verarbeiten
-      const hobbys = row[3].split(';');
-      for (const hobby of hobbys) {
-        if (hobby.trim()) {
-          const hobbyTeile = hobby.split('%');
-          const hobbyName = hobbyTeile[0].trim();
-          const suchPrioritaet = parseInt(hobbyTeile[1]); // Wie wichtig ist dem User dieses Hobby bei anderen
-
-          // Hobby in Master-Liste erstellen
-          await client.query(
-            'INSERT INTO hobbies (name) VALUES ($1) ON CONFLICT (name) DO NOTHING',
-            [hobbyName]
+          // Hobby anlegen (falls nicht vorhanden) und ID abfragen in einem Schritt
+          const hobbyRes = await pgClient.query(
+            `WITH ins AS (
+              INSERT INTO hobbies (name) VALUES ($1) ON CONFLICT(name) DO NOTHING RETURNING id
+            )
+            SELECT id FROM ins UNION ALL SELECT id FROM hobbies WHERE name = $1 LIMIT 1`,
+            [hobbyName.trim()]
           );
-          const hobbyResult = await client.query(
-            'SELECT id FROM hobbies WHERE name = $1',
-            [hobbyName]
-          );
-          const hobbyId = hobbyResult.rows[0].id;
+          const hobbyId = hobbyRes.rows[0].id;
 
-          // In user_hobby_preferences speichern
-          await client.query(
+          // Benutzer und Hobby in der Zwischentabelle verknüpfen
+          await pgClient.query(
             'INSERT INTO user_hobby_preferences (user_id, hobby_id, user_priority) VALUES ($1, $2, $3)',
-            [userId, hobbyId, suchPrioritaet]
+            [userId, hobbyId, parseInt(prio)]
           );
         }
-      }
-
-      console.log(`${vorname} ${nachname} + Hobby-Präferenzen importiert`);
-    } catch (error) {
-      if (error.code === '23505') {
-        console.log(`${vorname} ${nachname} bereits vorhanden (${email})`);
-      } else {
-        console.error(`Fehler bei ${vorname} ${nachname}:`, error.message);
+        importedCount++;
+      } catch (error) {
+        if (error.code === '23505') {
+          skippedCount++;
+        } else {
+          throw error;
+        }
       }
     }
+    console.log(
+      `Excel-Import: ${importedCount} Benutzer importiert (${skippedCount} übersprungen).`
+    );
+  } catch (error) {
+    console.error(`Import fehlgeschlagen: ${error.message}`);
+  } finally {
+    await pgClient.end();
   }
-
-  await client.end();
-  console.log('Excel-Import abgeschlossen!');
 }
 
-importExcelData();
+main();

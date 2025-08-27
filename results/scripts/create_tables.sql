@@ -102,10 +102,12 @@ CREATE TABLE messages (
     sender_id BIGINT NOT NULL,
     receiver_id BIGINT NOT NULL,
     content TEXT NOT NULL,
-    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    sent_at TIMESTAMPTZ NOT NULL, 
 
     CONSTRAINT fk_sender FOREIGN KEY(sender_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT fk_receiver FOREIGN KEY(receiver_id) REFERENCES users(id) ON DELETE CASCADE
+    CONSTRAINT fk_receiver FOREIGN KEY(receiver_id) REFERENCES users(id) ON DELETE CASCADE,
+
+    CONSTRAINT unique_message UNIQUE (sender_id, receiver_id, sent_at)
 );
 
 -- Tabelle für zusätzliche Benutzerfotos
