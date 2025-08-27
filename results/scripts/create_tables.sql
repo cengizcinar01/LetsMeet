@@ -3,6 +3,7 @@ DROP TABLE IF EXISTS photos;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS friendships;
 DROP TABLE IF EXISTS likes;
+DROP TABLE IF EXISTS user_interests;
 DROP TABLE IF EXISTS user_hobbies;
 DROP TABLE IF EXISTS hobbies;
 DROP TABLE IF EXISTS users;
@@ -22,7 +23,6 @@ CREATE TABLE users (
     gender VARCHAR(50),
     interested_in_gender VARCHAR(50),
     street VARCHAR(255),
-    house_number VARCHAR(20),
     postal_code VARCHAR(10),
     city VARCHAR(100),
     phone_number VARCHAR(50),
@@ -42,12 +42,11 @@ CREATE TABLE hobbies (
 -- 2. Tabellen mit Fremdschlüsseln
 -- =================================================================
 
--- Verknüpfungstabelle für Benutzer und ihre Hobbys
+-- Verknüpfungstabelle für Benutzer und ihre Hobbys (was User sucht/interessiert)
 CREATE TABLE user_hobbies (
     user_id BIGINT NOT NULL,
     hobby_id INT NOT NULL,
     user_priority SMALLINT,
-    interest_priority SMALLINT,
     
     -- Zusammengesetzter Primärschlüssel: Ein User kann ein Hobby nur einmal haben
     PRIMARY KEY (user_id, hobby_id),
@@ -55,6 +54,19 @@ CREATE TABLE user_hobbies (
     -- Definition der Fremdschlüssel-Beziehungen
     CONSTRAINT fk_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_hobby FOREIGN KEY(hobby_id) REFERENCES hobbies(id) ON DELETE CASCADE
+);
+
+-- Verknüpfungstabelle für Benutzer-Interessen
+CREATE TABLE user_interests (
+    user_id BIGINT NOT NULL,
+    hobby_id INT NOT NULL,
+    
+    -- Zusammengesetzter Primärschlüssel: Ein User kann ein Interest nur einmal haben
+    PRIMARY KEY (user_id, hobby_id),
+    
+    -- Definition der Fremdschlüssel-Beziehungen
+    CONSTRAINT fk_user_interest FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_hobby_interest FOREIGN KEY(hobby_id) REFERENCES hobbies(id) ON DELETE CASCADE
 );
 
 -- Verknüpfungstabelle für Likes zwischen Benutzern

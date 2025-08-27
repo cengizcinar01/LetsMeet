@@ -8,7 +8,7 @@ const client = new Client({
   password: 'secret',
 });
 
-async function importData() {
+async function importExcelData() {
   await client.connect();
 
   // Excel Datei lesen
@@ -22,13 +22,14 @@ async function importData() {
     const row = data[i];
     if (!row || row.length === 0) continue;
 
-    // Daten aus Excel holen
+    // Daten aus Excel extrahieren
     const name = row[0].split(', ');
     const vorname = name[1];
     const nachname = name[0];
 
+    // Adresse aufteilen: "Straße Nr, PLZ, Ort"
     const adresse = row[1].split(', ');
-    const strasse = adresse[0];
+    const strasse = adresse[0]; // Komplette Straße mit Hausnummer
     const plz = adresse[1];
     const ort = adresse[2];
 
@@ -41,7 +42,7 @@ async function importData() {
     const geburt = row[7].split('.');
     const geburtsdatum = `${geburt[2]}-${geburt[1]}-${geburt[0]}`;
 
-    // User in Datenbank speichern (überspringen falls E-Mail bereits existiert)
+    // Benutzer erstellen
     try {
       const userResult = await client.query(
         `
@@ -65,15 +66,15 @@ async function importData() {
 
       const userId = userResult.rows[0].id;
 
-      // Hobbys verarbeiten
+      // Hobby-Präferenzen verarbeiten
       const hobbys = row[3].split(';');
       for (const hobby of hobbys) {
         if (hobby.trim()) {
           const hobbyTeile = hobby.split('%');
           const hobbyName = hobbyTeile[0].trim();
-          const prioritaet = parseInt(hobbyTeile[1]);
+          const suchPrioritaet = parseInt(hobbyTeile[1]); // Wie wichtig ist dem User dieses Hobby bei anderen
 
-          // Hobby erstellen falls nicht vorhanden
+          // Hobby in Master-Liste erstellen
           await client.query(
             'INSERT INTO hobbies (name) VALUES ($1) ON CONFLICT (name) DO NOTHING',
             [hobbyName]
@@ -84,15 +85,15 @@ async function importData() {
           );
           const hobbyId = hobbyResult.rows[0].id;
 
-          // User-Hobby Verbindung
+          // In user_hobbies speichern (was User bei anderen SUCHT)
           await client.query(
             'INSERT INTO user_hobbies (user_id, hobby_id, user_priority) VALUES ($1, $2, $3)',
-            [userId, hobbyId, prioritaet]
+            [userId, hobbyId, suchPrioritaet]
           );
         }
       }
 
-      console.log(`${vorname} ${nachname} importiert`);
+      console.log(`${vorname} ${nachname} + Hobby-Präferenzen importiert`);
     } catch (error) {
       if (error.code === '23505') {
         console.log(`${vorname} ${nachname} bereits vorhanden (${email})`);
@@ -103,7 +104,7 @@ async function importData() {
   }
 
   await client.end();
-  console.log('Fertig!');
+  console.log('Excel-Import abgeschlossen!');
 }
 
-importData();
+importExcelData();
