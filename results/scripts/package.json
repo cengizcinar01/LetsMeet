@@ -6,7 +6,8 @@
     "excel": "node import_excel.js",
     "mongo": "node import_mongo.js",
     "xml": "node import_xml.js",
-    "all": "npm run excel && npm run mongo && npm run xml"
+    "all": "npm run excel && npm run mongo && npm run xml",
+    "test": "node import_test.js"
   },
   "dependencies": {
     "pg": "^8.11.3",

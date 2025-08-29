@@ -1,32 +1,28 @@
-# Phase 1: Konzeptionelles & Logisches Datenmodell
-
 ## 1. Einleitung und Zielsetzung
 
-Dieses Dokument bildet den ersten Schritt der Datenbankmigration für die Let's Meet GmbH. Grundlage dafür ist eine Analyse der bestehenden Datenquellen (Excel, MongoDB, XML) sowie eine Betrachtung der zukünftigen Anwendungsfälle.
+Dieses Dokument bildet den ersten Schritt der Datenbankmigration für die Let's Meet GmbH. Grundlage dafür ist eine Analyse der bestehenden Datenquellen: Excel, MongoDB, XML, sowie eine Betrachtung der zukünftigen Anwendungsfälle.
 
-Als Ergebnis liegt ein logisches Datenmodell in Form eines Entity-Relationship-Diagramms (ERD) vor. Dieses Modell dient als Grundlage für die anschließende Umsetzung in einer PostgreSQL-Datenbank. Ziel ist es, mit einer normalisierten und robusten Struktur spätere Probleme bei Datenoperationen (Ändern, Löschen, Einfügen) von vornherein zu vermeiden.
+Als Ergebnis liegt ein logisches Datenmodell in Form eines Entity-Relationship-Diagramms vor. Dieses Modell dient als Grundlage für die anschließende Umsetzung in einer PostgreSQL-Datenbank.
 
 ## 2. Datenmodell
 
-![Kozeptuelles Datenmodell für Let's Meet](assets/konzeptuelles_modell.png)
-![Logisches Datenmodell für Let's Meet](assets/logisches_modell.png)
+![Kozeptuelles und logisches Datenmodell für Let's Meet](assets/datenmodell.png)
 
 ## 3. Entwurfsentscheidungen
 
-Das Modell orientiert sich an den Grundsätzen der Datenbanknormalisierung, insbesondere der 3. Normalform. Dadurch werden Redundanzen vermieden und die Datenintegrität gewährleistet.
+Das Modell orientiert sich an den Grundsätzen der Datenbanknormalisierung insbesondere der 3. Normalform, um Redundanzen zu minimieren und die Datenintegrität zu maximieren.
 
-- **Zentrale Entität `users`**:  
-  Die `users`-Tabelle bildet den Kern des Modells und enthält alle Benutzerdaten.
+**Zentrale Entität `users`:**
+Die `users`-Tabelle bildet den Kern des Modells und enthält alle Benutzer-Stammdaten.
 
-- **Atomare Speicherung von Daten**:  
-  Werte wie Name (`first_name`, `last_name`) und Adresse (`street`, `postal_code`, `city`) wurden in Einzelfelder zerlegt. So werden Filterungen und Sortierungen deutlich erleichtert.
+**Atomare Speicherung von Daten:**
+Werte wie Name (`first_name`, `last_name`) und Adresse (`street`, `postal_code`, `city`) wurden in Einzelfelder zerlegt, um Filterungen und Sortierungen zu ermöglichen.
 
-- **Auslagerung von Hobbys**:  
-  Die Tabelle `hobbies` sorgt für eine eindeutige Verwaltung von Hobby-Bezeichnungen.  
-  Die Verknüpfungstabelle `user_hobbies` löst die n:m-Beziehung auf und ermöglicht gleichzeitig die Speicherung individueller Präferenzen oder Priorisierungen.
+**Detaillierte Modellierung von Hobbys:**
+Die `hobbies`-Tabelle sorgt für eine zentrale und redundanzfreie Verwaltung aller Hobby-Bezeichnungen. Um die unterschiedlichen Kontexte klar zu trennen, wurden zwei Verknüpfungstabellen eingeführt:
 
-- **Beziehungsmodellierung**:  
-  n:m-Beziehungen wie `likes` oder `friendships` werden über eigene Verknüpfungstabellen abgebildet. Dadurch lassen sich Zusatzinformationen wie der aktuelle `status` einer Freundschaftsanfrage flexibel speichern.
+- **`user_hobbies`:** Bildet ab, welche Hobbys ein Benutzer selbst hat und wie er diese priorisiert.
+- **`user_hobby_preferences`:** Bildet ab, welche Hobbys ein Benutzer bei anderen Nutzern sucht und wie er diese bewertet.
 
 ## 4. Datenschutz
 
@@ -129,7 +125,7 @@ npm install
 docker-compose up -d
 
 # 2. Tabellen erstellen
-PGPASSWORD=secret psql -h localhost -U user -d lf8_lets_meet_db -f results/scripts/create_tables.sql
+PGPASSWORD=secret psql -h localhost -U user -d lf8_lets_meet_db -f create_tables.sql
 ```
 
 ### Import Ausführung
@@ -171,4 +167,45 @@ npm run xml
 ```bash
 cd results/scripts
 npm run all
+```
+
+## 6. Tests
+
+Nach dem Import der Daten sollten Tests ausgeführt werden, um die Integrität und Vollständigkeit der importierten Daten zu überprüfen.
+
+### Test-Ausführung
+
+```bash
+cd results/scripts
+npm run test
+```
+
+### Was wird getestet?
+
+- **Anzahl importierter User**: Überprüft, ob alle Benutzer aus den Quelldaten erfolgreich importiert wurden
+- **Anzahl verschiedener Hobbys**: Validiert die Hobby-Kategorien aus allen Datenquellen
+- **Hobby-Präferenzen**: Zählt die aus Excel importierten Benutzer-Hobby-Präferenzen
+- **User-Hobby-Verknüpfungen**: Überprüft die aus XML importierten Hobby-Fähigkeiten
+- **Likes**: Validiert die aus MongoDB importierten Like-Beziehungen
+- **Nachrichten**: Überprüft die aus MongoDB importierten Nachrichten
+
+#### Datenintegrität-Prüfung
+
+- **Foreign Key Constraints**: Überprüft, ob alle Referenzen zwischen Tabellen gültig sind
+- **Ungültige User-Präferenzen**: Erkennt Hobby-Präferenzen ohne gültigen Benutzer-Bezug
+- **Ungültige Likes**: Identifiziert Like-Einträge mit ungültigen Benutzer-IDs
+
+### Erwartete Test-Ausgabe
+
+```
+1576 User importiert
+246 verschiedene Hobbys gefunden
+4828 Hobby-Präferenzen importiert
+300 User-Hobby-Verknüpfungen importiert
+500 Likes importiert
+300 Nachrichten importiert
+0 ungültige User-Präferenzen
+0 ungültige Likes
+
+Alle Tests abgeschlossen!
 ```
