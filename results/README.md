@@ -109,7 +109,7 @@ docker-compose down
 - **Passwort**: secret
 - **Datenbank**: lf8_lets_meet_db
 
-## Import Scripts
+## 6. Import Scripts
 
 ### Installation
 
@@ -169,7 +169,7 @@ cd results/scripts
 npm run all
 ```
 
-## 6. Tests
+## 7. Tests
 
 Nach dem Import der Daten sollten Tests ausgeführt werden, um die Integrität und Vollständigkeit der importierten Daten zu überprüfen.
 
