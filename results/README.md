@@ -73,32 +73,16 @@ Daten wie sexuelle Orientierung und private Nachrichten haben einen extrem hohen
 docker-compose up -d
 ```
 
-### 2. Benutzer und Datenbank erstellen
+### 2. Tabellen erstellen
 
 ```bash
-PGPASSWORD=secret psql -h localhost -U postgres -c "CREATE USER \"user\" WITH PASSWORD 'secret';"
+docker exec -i lf8_lets_meet_postgres_container psql -U user -d lf8_lets_meet_db < results/scripts/create_tables.sql
 ```
 
-```bash
-PGPASSWORD=secret psql -h localhost -U postgres -c "CREATE DATABASE lf8_lets_meet_db OWNER \"user\";"
-```
-
-### 3. Tabellen erstellen
+### 3. Prüfen ob alles funktioniert
 
 ```bash
-PGPASSWORD=secret psql -h localhost -U user -d lf8_lets_meet_db -f results/scripts/create_tables.sql
-```
-
-### 4. Prüfen ob alles funktioniert
-
-```bash
-PGPASSWORD=secret psql -h localhost -U user -d lf8_lets_meet_db -c "\dt"
-```
-
-### 5. Container stoppen (wenn fertig)
-
-```bash
-docker-compose down
+docker exec -i lf8_lets_meet_postgres_container psql -U user -d lf8_lets_meet_db -c "\dt"
 ```
 
 ## Wichtige Verbindungsdaten
@@ -125,7 +109,7 @@ npm install
 docker-compose up -d
 
 # 2. Tabellen erstellen
-PGPASSWORD=secret psql -h localhost -U user -d lf8_lets_meet_db -f create_tables.sql
+docker exec -i lf8_lets_meet_postgres_container psql -U user -d lf8_lets_meet_db < create_tables.sql
 ```
 
 ### Import Ausführung
