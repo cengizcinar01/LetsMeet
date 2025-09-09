@@ -25,8 +25,6 @@ async function main() {
 
     // Durch jede Zeile iterieren (erste Zeile ist die Überschrift, wird übersprungen)
     for (const row of data.slice(1)) {
-      if (!row || row.length === 0) continue;
-
       try {
         // Benutzerdaten aus den Zeilen extrahieren und formatieren
         const [nachname, vorname] = row[0].split(', ');
@@ -70,7 +68,7 @@ async function main() {
           // Benutzer und Hobby in der Zwischentabelle verknüpfen
           await pgClient.query(
             'INSERT INTO user_hobby_preferences (user_id, hobby_id, user_priority) VALUES ($1, $2, $3)',
-            [userId, hobbyId, parseInt(prio)]
+            [userId, hobbyId, prio]
           );
         }
         importedCount++;
