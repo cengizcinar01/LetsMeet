@@ -15,10 +15,10 @@ async function main() {
   const pgClient = new Client(PG_CONFIG);
   const mongoClient = new MongoClient(MONGO_URL);
 
-  let importedLikes = 0,
-    skippedLikes = 0;
-  let importedMessages = 0,
-    skippedMessages = 0;
+  let importedLikes = 0;
+  let skippedLikes = 0;
+  let importedMessages = 0;
+  let skippedMessages = 0;
 
   try {
     await Promise.all([pgClient.connect(), mongoClient.connect()]);
@@ -36,33 +36,36 @@ async function main() {
     // Durch jeden MongoDB-Benutzer iterieren
     for (const mongoUser of mongoUsers) {
       const senderId = userEmailToIdMap.get(mongoUser._id);
-      if (!senderId) continue; // Wenn der Sender nicht in unserer PG-DB ist, überspringen
 
       // Likes des Benutzers importieren
-      for (const like of mongoUser.likes || []) {
+      for (const like of mongoUser.likes) {
         const likedId = userEmailToIdMap.get(like.liked_email);
         if (likedId) {
           const res = await pgClient.query(
             'INSERT INTO likes (liker_id, liked_id, status, created_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING',
             [senderId, likedId, like.status, like.timestamp]
           );
-          res.rowCount > 0 ? importedLikes++ : skippedLikes++;
-        } else {
-          skippedLikes++;
+          if (res.rowCount > 0) {
+            importedLikes++;
+          } else {
+            skippedLikes++;
+          }
         }
       }
 
       // Nachrichten des Benutzers importieren
-      for (const message of mongoUser.messages || []) {
+      for (const message of mongoUser.messages) {
         const receiverId = userEmailToIdMap.get(message.receiver_email);
         if (receiverId) {
           const res = await pgClient.query(
             'INSERT INTO messages (sender_id, receiver_id, content, sent_at) VALUES ($1, $2, $3, $4) ON CONFLICT (sender_id, receiver_id, sent_at) DO NOTHING',
             [senderId, receiverId, message.message, message.timestamp]
           );
-          res.rowCount > 0 ? importedMessages++ : skippedMessages++;
-        } else {
-          skippedMessages++;
+          if (res.rowCount > 0) {
+            importedMessages++;
+          } else {
+            skippedMessages++;
+          }
         }
       }
     }
