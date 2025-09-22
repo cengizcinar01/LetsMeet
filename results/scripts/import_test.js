@@ -2,6 +2,7 @@ const {Client} = require('pg');
 
 const PG_CONFIG = {
   host: 'localhost',
+  port: 5433,
   database: 'lf8_lets_meet_db',
   user: 'user',
   password: 'secret',
